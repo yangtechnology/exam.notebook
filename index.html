@@ -3,12 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>期中考 AI 戰情室｜專屬知識庫與智慧刷題系統</title>
-  <!-- Tailwind CSS -->
+  <title>期中考 AI 戰情室 V2.0｜智慧快取與批次刷題系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Marked.js (Markdown 解析) -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- KaTeX (經濟/會計/微積分公式渲染) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -17,9 +14,12 @@
     body { font-family: 'Noto Sans TC', sans-serif; background-color: #0f172a; color: #f8fafc; }
     .glass-panel { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.15); }
     .nav-active { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.35); }
-    .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 700; color: #93c5fd; margin-top: 1rem; margin-bottom: 0.5rem; }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 700; color: #93c5fd; margin-top: 1.1rem; margin-bottom: 0.5rem; }
     .markdown-body p { margin-bottom: 0.75rem; line-height: 1.75; }
     .markdown-body ul, .markdown-body ol { padding-left: 1.5rem; margin-bottom: 0.75rem; list-style-type: disc; }
+    .markdown-body table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
+    .markdown-body th, .markdown-body td { border: 1px solid #334155; padding: 0.5rem 0.75rem; text-align: left; }
+    .markdown-body th { background-color: #1e293b; color: #cbd5e1; }
     .markdown-body code { background: #1e293b; padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #fbbf24; }
     .markdown-body pre { background: #0f172a; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 1rem; border: 1px solid #334155; }
   </style>
@@ -31,13 +31,15 @@
     <div class="flex items-center gap-3">
       <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-black text-xl shadow-lg shadow-blue-600/30">學</div>
       <div>
-        <h1 class="text-lg font-bold tracking-wide">期中考 AI 戰情室</h1>
-        <p class="text-xs text-slate-400">課本解析・變體刷題・錯題加權・模擬實戰</p>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-bold tracking-wide">期中考 AI 戰情室</h1>
+          <span class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">V2.0 省 Token 快取版</span>
+        </div>
+        <p class="text-xs text-slate-400">精講永久快取・整卷作答一次批改・既有題庫 0 Token 刷題</p>
       </div>
     </div>
 
-    <!-- 科目切換與後端設定 -->
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2.5">
       <select id="subjectFilter" onchange="onSubjectChange()" class="bg-slate-800 border border-slate-700 text-sm rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-blue-500">
         <option value="全部科目">全部科目</option>
         <option value="會計學">會計學</option>
@@ -45,8 +47,11 @@
         <option value="微積分與統計">微積分與統計</option>
         <option value="其他專業科目">其他專業科目</option>
       </select>
-      <button onclick="openSettingsModal()" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition">
-        <span>⚙️ 系統連線設定</span>
+      <button onclick="syncAllData()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium transition" title="重新從試算表同步資料">
+        🔄 同步
+      </button>
+      <button onclick="openSettingsModal()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium transition">
+        ⚙️ 連線設定
       </button>
     </div>
   </header>
@@ -54,19 +59,19 @@
   <!-- 主體佈局 -->
   <div class="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-    <!-- 左側功能選單 -->
+    <!-- 左側選單 -->
     <aside class="lg:col-span-3 space-y-2">
       <button onclick="switchTab('tab-files')" id="btn-tab-files" class="w-full text-left px-4 py-3.5 rounded-xl font-medium text-sm flex items-center justify-between transition nav-active">
         <span>📁 教材與習題上傳</span>
         <span id="badge-files" class="text-xs px-2 py-0.5 rounded-full bg-slate-900/40">0</span>
       </button>
       <button onclick="switchTab('tab-review')" id="btn-tab-review" class="w-full text-left px-4 py-3.5 rounded-xl font-medium text-sm flex items-center justify-between text-slate-300 hover:bg-slate-800/60 transition">
-        <span>🧠 知識點導讀與問答</span>
+        <span>🧠 知識點導讀 (快取)</span>
         <span id="badge-kps" class="text-xs px-2 py-0.5 rounded-full bg-slate-800">0</span>
       </button>
       <button onclick="switchTab('tab-practice')" id="btn-tab-practice" class="w-full text-left px-4 py-3.5 rounded-xl font-medium text-sm flex items-center justify-between text-slate-300 hover:bg-slate-800/60 transition">
-        <span>✍️ 智慧變體刷題</span>
-        <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">AI 出題</span>
+        <span>✍️ 批次刷題中心</span>
+        <span id="badge-qbank" class="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">題庫 0</span>
       </button>
       <button onclick="switchTab('tab-errors')" id="btn-tab-errors" class="w-full text-left px-4 py-3.5 rounded-xl font-medium text-sm flex items-center justify-between text-slate-300 hover:bg-slate-800/60 transition">
         <span>📓 錯題本清零專區</span>
@@ -79,7 +84,7 @@
 
       <!-- 戰力統計小卡 -->
       <div class="glass-panel rounded-2xl p-4 mt-6 space-y-3">
-        <div class="text-xs font-bold text-slate-400">📊 當前備考戰力指標</div>
+        <div class="text-xs font-bold text-slate-400">📊 備考戰力與省額度統計</div>
         <div class="flex justify-between items-end">
           <span class="text-xs text-slate-300">平均知識點熟練度</span>
           <span id="stat-mastery" class="text-xl font-black text-emerald-400">0%</span>
@@ -88,6 +93,10 @@
           <div id="bar-mastery" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
         </div>
         <div class="pt-2 border-t border-slate-800 flex justify-between text-xs text-slate-400">
+          <span>已快取精講數 (0 Token)</span>
+          <span id="stat-cached-kps" class="text-blue-400 font-bold">0 / 0</span>
+        </div>
+        <div class="flex justify-between text-xs text-slate-400">
           <span>待消滅錯題數</span>
           <span id="stat-error-count" class="text-rose-400 font-bold">0 題</span>
         </div>
@@ -101,7 +110,7 @@
       <section id="tab-files" class="space-y-6">
         <div class="glass-panel rounded-2xl p-6">
           <h2 class="text-lg font-bold mb-1">上傳課本 PDF 或老師勾選的習題照片</h2>
-          <p class="text-xs text-slate-400 mb-4">系統將自動傳送至 Gemini 解析章節架構、提煉必考知識點並存入資料庫。</p>
+          <p class="text-xs text-slate-400 mb-4">上傳一次即可永久建立章節知識點索引，後續複習與刷題皆直接調用。</p>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
@@ -114,67 +123,72 @@
               </select>
             </div>
             <div class="md:col-span-2">
-              <label class="block text-xs text-slate-400 mb-1">選擇檔案 (支援 PDF / JPG / PNG，建議單檔小於 25MB)</label>
+              <label class="block text-xs text-slate-400 mb-1">選擇檔案 (支援 PDF / JPG / PNG)</label>
               <input type="file" id="fileInput" accept=".pdf,image/*" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white file:text-xs hover:file:bg-blue-500" />
             </div>
           </div>
 
           <button onclick="uploadMaterial()" class="w-full md:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/30 transition">
-            🚀 開始上傳並由 AI 萃取知識點
+            🚀 上傳並由 AI 提煉知識點
           </button>
         </div>
 
-        <!-- 已上傳教材清單 -->
         <div class="space-y-3">
           <h3 class="text-sm font-bold text-slate-300 px-1">已建立索引的教材庫</h3>
           <div id="fileListContainer" class="grid grid-cols-1 gap-4"></div>
         </div>
       </section>
 
-      <!-- 分頁 2：知識點導讀與問答 -->
+      <!-- 分頁 2：知識點導讀與問答 (含永久快取) -->
       <section id="tab-review" class="hidden space-y-6">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <!-- 知識點列表 -->
-          <div class="lg:col-span-5 glass-panel rounded-2xl p-4 max-h-[70vh] overflow-y-auto space-y-2.5" id="kpListContainer">
-          </div>
+          <!-- 左側知識點列表 -->
+          <div class="lg:col-span-5 glass-panel rounded-2xl p-4 max-h-[75vh] overflow-y-auto space-y-2.5" id="kpListContainer"></div>
 
-          <!-- 知識點 AI 精講與蘇格拉底問答室 -->
-          <div class="lg:col-span-7 glass-panel rounded-2xl p-6 flex flex-col min-h-[60vh]">
-            <div id="kpDetailHeader" class="border-b border-slate-800 pb-3 mb-4">
-              <span class="text-xs text-blue-400 font-bold">請從左側選擇一個知識點</span>
-              <h3 class="text-base font-bold mt-1">AI 教授精講與互動提問</h3>
+          <!-- 右側精講內容區 -->
+          <div class="lg:col-span-7 glass-panel rounded-2xl p-6 flex flex-col min-h-[65vh]">
+            <div id="kpDetailHeader" class="border-b border-slate-800 pb-3 mb-4 flex items-start justify-between gap-2">
+              <div>
+                <span class="text-xs text-blue-400 font-bold">請從左側選擇一個知識點</span>
+                <h3 class="text-base font-bold mt-1">AI 教授精講（自動存檔快取，重複點擊不耗 Token）</h3>
+              </div>
+              <button id="btnRegenerateKp" onclick="regenerateCurrentKP()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 whitespace-nowrap transition">
+                🔄 重新生成精講
+              </button>
             </div>
 
             <div id="kpExplanationArea" class="flex-1 overflow-y-auto markdown-body text-sm text-slate-200 space-y-4 pr-1">
               <div class="text-slate-500 text-center py-16 text-sm">
-                點擊左側任一知識點，AI 將根據你上傳的課本內容進行深度推導與例題拆解。
+                點擊左側任一知識點：<br>
+                ⚡ 標記「<span class="text-emerald-400 font-bold">已快取</span>」的項目將 <strong>0 秒瞬間顯示、消耗 0 Token</strong>！<br>
+                ✨ 標記「未生成」的項目點擊後將由 AI 推導並自動永久存入試算表。
               </div>
             </div>
 
             <!-- 追問輸入框 -->
             <div class="mt-4 pt-3 border-t border-slate-800 flex gap-2">
-              <input type="text" id="kpUserQuestion" placeholder="針對這個觀念有不懂的地方？直接向 AI 提問或回答上方反問..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500" />
+              <input type="text" id="kpUserQuestion" placeholder="針對這個觀念有疑問？輸入問題後將追加解答並自動存檔..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500" />
               <button onclick="askFollowUpOnKP()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-bold whitespace-nowrap transition">
-                提問
+                追問 AI
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 分頁 3：智慧變體刷題 -->
+      <!-- 分頁 3：批次刷題中心 (整批作答、統一交卷) -->
       <section id="tab-practice" class="hidden space-y-6">
         <div class="glass-panel rounded-2xl p-6">
-          <h2 class="text-lg font-bold mb-1">智慧變體刷題中心</h2>
-          <p class="text-xs text-slate-400 mb-4">指定特定知識點，AI 會根據課本與習題邏輯，即時生成全新的變體選擇題，徹底檢驗觀念死角。</p>
+          <h2 class="text-lg font-bold mb-1">✍️ 智慧批次刷題中心（全部寫完統一交卷批改）</h2>
+          <p class="text-xs text-slate-400 mb-4">你可以選擇「從既有題庫抽題（0 Token 瞬間出題）」或是「呼叫 AI 生成全新變體題」。所有題目作答完畢後再一次送出批改！</p>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div class="md:col-span-2">
-              <label class="block text-xs text-slate-400 mb-1">選擇要刷題的知識點</label>
+              <label class="block text-xs text-slate-400 mb-1">選擇知識點範圍</label>
               <select id="practiceKpSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm"></select>
             </div>
             <div>
-              <label class="block text-xs text-slate-400 mb-1">生成題數</label>
+              <label class="block text-xs text-slate-400 mb-1">題數設定</label>
               <select id="practiceCountSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm">
                 <option value="3">3 題 (快速檢測)</option>
                 <option value="5" selected>5 題 (標準練習)</option>
@@ -183,21 +197,45 @@
             </div>
           </div>
 
-          <button onclick="startPracticeQuiz()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/30 transition">
-            ⚡ 立即生成變體題目
+          <div class="flex flex-wrap gap-3">
+            <button onclick="loadExistingPracticeQuiz()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/25 transition">
+              📚 從既有題庫抽題練習 (0 Token・瞬間載入)
+            </button>
+            <button onclick="generateNewPracticeQuiz()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/25 transition">
+              ⚡ 呼叫 AI 生成全新變體題 (消耗 Token)
+            </button>
+          </div>
+        </div>
+
+        <!-- 刷題進度與結果橫幅 -->
+        <div id="practiceStatusBanner" class="hidden glass-panel rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 border border-blue-500/30">
+          <div id="practiceProgressText" class="text-sm font-bold text-slate-200">作答進度：0 / 0 題</div>
+          <button id="btnSubmitPractice" onclick="submitBatchQuiz('PRACTICE')" class="px-6 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-sm transition">
+            📄 統一交卷並查看詳解
           </button>
         </div>
 
         <div id="practiceQuestionsContainer" class="space-y-4"></div>
+
+        <!-- 底部交卷按鈕 -->
+        <div id="practiceBottomBar" class="hidden glass-panel rounded-2xl p-4 flex justify-between items-center">
+          <span class="text-xs text-slate-400">確認所有題目皆已選擇完畢後，點擊右側按鈕一次性批改並存入 Google Sheets</span>
+          <button onclick="submitBatchQuiz('PRACTICE')" class="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-sm transition">
+            📄 統一交卷並批改
+          </button>
+        </div>
       </section>
 
-      <!-- 分頁 4：錯題本清零專區 -->
+      <!-- 分頁 4：錯題本清零專區 (支援整批重測統一交卷) -->
       <section id="tab-errors" class="hidden space-y-6">
         <div class="glass-panel rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 class="text-lg font-bold text-rose-400">📓 個人專屬錯題本</h2>
-            <p class="text-xs text-slate-400">所有在刷題或模擬考答錯的題目都會自動收錄於此。重做並答對後即可將其從錯題本移除！</p>
+            <h2 class="text-lg font-bold text-rose-400">📓 個人專屬錯題本（批次重測清零）</h2>
+            <p class="text-xs text-slate-400">直接在下方勾選答案，寫完後點擊「統一交卷批改」，答對的題目將自動從錯題本移除！</p>
           </div>
+          <button id="btnSubmitErrors" onclick="submitBatchQuiz('ERROR_BOOK')" class="hidden px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-600/30 transition">
+            ✅ 統一批改錯題並移除答對題目
+          </button>
         </div>
         <div id="errorBookContainer" class="space-y-4"></div>
       </section>
@@ -208,15 +246,14 @@
           <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
             <div>
               <h2 class="text-lg font-bold">⏱️ 期中考高壓模擬實戰</h2>
-              <p class="text-xs text-slate-400">系統將綜合該科目的核心知識點，並針對你「錯題本」中的高頻弱點進行加權命題。</p>
+              <p class="text-xs text-slate-400">可選擇「從題庫+錯題組卷 (0 Token)」或「AI 全新命題」，全卷寫完統一交卷計分。</p>
             </div>
-            <!-- 倒數計時器 -->
             <div id="examTimerBox" class="hidden px-4 py-2 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono font-bold text-lg">
               00:00
             </div>
           </div>
 
-          <div id="examConfigPanel" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label class="block text-xs text-slate-400 mb-1">報考科目</label>
               <select id="examSubjectSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm">
@@ -231,29 +268,37 @@
               <select id="examCountSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm">
                 <option value="5">5 題 (10 分鐘隨堂考)</option>
                 <option value="10" selected>10 題 (20 分鐘期中模擬)</option>
+                <option value="15">15 題 (30 分鐘完整測驗)</option>
               </select>
             </div>
             <div class="flex items-end">
-              <button onclick="startMockExam()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/30 transition">
-                🔥 開始計時模擬考
-              </button>
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pb-2.5">
+                <input type="checkbox" id="useAiDiagnosisCheck" class="rounded bg-slate-900 border-slate-700 text-blue-600" />
+                <span>交卷時呼叫 AI 產生弱點文字診斷 (耗少量 Token)</span>
+              </label>
             </div>
+          </div>
+
+          <div class="flex flex-wrap gap-3">
+            <button onclick="startLocalMockExam()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-sm shadow-lg shadow-emerald-600/30 transition">
+              📚 從題庫與錯題加權抽題組卷 (0 Token・瞬間開考)
+            </button>
+            <button onclick="startAiMockExam()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/30 transition">
+              🔥 呼叫 AI 全新命題模擬考 (消耗 Token)
+            </button>
           </div>
         </div>
 
-        <!-- 模擬考作答區 -->
+        <div id="examResultDiagnosis" class="hidden glass-panel rounded-2xl p-6 border border-emerald-500/40 space-y-3"></div>
         <div id="examPaperContainer" class="space-y-4"></div>
 
-        <!-- 交卷按鈕與成績診斷報告 -->
-        <div id="examSubmitBar" class="hidden glass-panel rounded-2xl p-4 flex justify-end">
+        <div id="examSubmitBar" class="hidden glass-panel rounded-2xl p-4 flex justify-between items-center">
+          <span id="examProgressText" class="text-sm font-bold text-slate-200">作答進度：0 / 0 題</span>
           <button onclick="submitMockExam()" class="px-8 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-sm transition">
-            📄 正式交卷並產生 AI 弱點診斷報告
+            📄 正式交卷並批改考卷
           </button>
         </div>
 
-        <div id="examResultDiagnosis" class="hidden glass-panel rounded-2xl p-6 border border-emerald-500/40 space-y-3"></div>
-
-        <!-- 歷史模擬考紀錄 -->
         <div class="space-y-3">
           <h3 class="text-sm font-bold text-slate-300 px-1">歷次模擬考戰績紀錄</h3>
           <div id="examHistoryContainer" class="space-y-2.5"></div>
@@ -268,12 +313,12 @@
     <div class="glass-panel rounded-2xl max-w-lg w-full p-6 space-y-4 border border-slate-700">
       <h3 class="text-lg font-bold">⚙️ 後端 GAS 網頁應用程式連線設定</h3>
       <p class="text-xs text-slate-400 leading-relaxed">
-        請貼上部署為「網頁應用程式」的 Google Apps Script 網址（以 <code class="text-amber-400">https://script.google.com/macros/s/.../exec</code> 結尾）。網址將安全儲存於你的瀏覽器本機。
+        系統已預設內建你的專屬 GAS 網址。若未來更換專案，可於下方修改：
       </p>
-      <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/xxxxxx/exec" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500" />
+      <input type="url" id="gasUrlInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-blue-500" />
       <div class="flex justify-end gap-2 pt-2">
-        <button onclick="closeSettingsModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">取消</button>
-        <button onclick="saveGasUrl()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold">儲存並同步資料庫</button>
+        <button onclick="closeSettingsModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">關閉</button>
+        <button onclick="saveGasUrl()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold">儲存並同步</button>
       </div>
     </div>
   </div>
@@ -281,38 +326,35 @@
   <!-- 全域 Loading 遮罩 -->
   <div id="loadingOverlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex-col items-center justify-center gap-4">
     <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-    <p id="loadingText" class="text-sm font-bold text-slate-200">AI 正在深度運算中，請稍候...</p>
+    <p id="loadingText" class="text-sm font-bold text-slate-200">資料同步中...</p>
   </div>
 
   <script>
-    // 全域狀態管理
+    // 已直接內建你提供的 GAS 部署網址
+    const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzyW_Z_EN56rkWb1pGLaFo0Y3SFEYLzPQslH8jv5io5rtRDeTZ9Bolsu7logWplR2xY/exec';
+
     let STATE = {
-      gasUrl: localStorage.getItem('EXAM_ASSISTANT_GAS_URL') || '',
+      gasUrl: localStorage.getItem('EXAM_ASSISTANT_GAS_URL') || DEFAULT_GAS_URL,
       subjectFilter: '全部科目',
       files: [],
       kps: [],
       questions: [],
       exams: [],
       activeKpId: null,
-      currentExamQuestions: [],
+      // 批次作答狀態管理 (不立即送出，等使用者點擊交卷)
+      practicePaper: [],
+      errorPaper: [],
+      examPaper: [],
       examTimerInterval: null,
       examSecondsElapsed: 0
     };
 
     window.addEventListener('DOMContentLoaded', () => {
-      if (!STATE.gasUrl) {
-        openSettingsModal();
-      } else {
-        syncAllData();
-      }
+      localStorage.setItem('EXAM_ASSISTANT_GAS_URL', STATE.gasUrl);
+      syncAllData();
     });
 
-    // 封裝跨網域 POST 請求 (採用 text/plain 避開 CORS Preflight)
     async function callBackend(action, payload = {}, loadingMsg = '資料同步中...') {
-      if (!STATE.gasUrl) {
-        openSettingsModal();
-        throw new Error('請先設定 GAS 後端網址');
-      }
       showLoading(loadingMsg);
       try {
         const res = await fetch(STATE.gasUrl, {
@@ -326,7 +368,7 @@
         }
         return json.data;
       } catch (err) {
-        alert('系統錯誤：' + err.message);
+        alert('連線或系統錯誤：' + err.message);
         throw err;
       } finally {
         hideLoading();
@@ -334,7 +376,7 @@
     }
 
     async function syncAllData() {
-      const data = await callBackend('INIT_DATA', {}, '正在從 Google Sheets 載入你的知識庫與錯題本...');
+      const data = await callBackend('INIT_DATA', {}, '正在從 Google Sheets 載入知識庫、快取精講與題庫...');
       STATE.files = data.files || [];
       STATE.kps = data.kps || [];
       STATE.questions = data.questions || [];
@@ -361,18 +403,22 @@
       renderExamHistory();
     }
 
-    // 1. 渲染戰力統計與徽章
+    // 1. 渲染戰力與快取統計
     function renderStats() {
       const kps = filterBySubject(STATE.kps);
       const files = filterBySubject(STATE.files);
-      const errors = filterBySubject(STATE.questions).filter(q => q['收錄於錯題本'] === '是');
+      const qs = filterBySubject(STATE.questions);
+      const errors = qs.filter(q => q['收錄於錯題本'] === '是');
       const exams = filterBySubject(STATE.exams);
+      const cachedKps = kps.filter(k => k['AI精講快取'] && String(k['AI精講快取']).trim() !== '');
 
       document.getElementById('badge-files').textContent = files.length;
       document.getElementById('badge-kps').textContent = kps.length;
+      document.getElementById('badge-qbank').textContent = `題庫 ${qs.length}`;
       document.getElementById('badge-errors').textContent = errors.length;
       document.getElementById('badge-exams').textContent = exams.length;
       document.getElementById('stat-error-count').textContent = `${errors.length} 題`;
+      document.getElementById('stat-cached-kps').textContent = `${cachedKps.length} / ${kps.length}`;
 
       const avg = kps.length
         ? Math.round(kps.reduce((acc, k) => acc + (Number(k['熟練度(0-100)']) || 50), 0) / kps.length)
@@ -381,7 +427,7 @@
       document.getElementById('bar-mastery').style.width = `${avg}%`;
     }
 
-    // 2. 上傳教材與渲染清單
+    // 2. 教材上傳與清單
     async function uploadMaterial() {
       const fileInput = document.getElementById('fileInput');
       const subject = document.getElementById('uploadSubject').value;
@@ -395,13 +441,13 @@
         mimeType: file.type || 'application/pdf',
         base64Data: base64Data,
         subject: subject
-      }, '正在將教材上傳至 Gemini 並自動提煉必考知識點（大型 PDF 約需 15~30 秒）...');
+      }, '正在將教材上傳至 Gemini 並提煉必考知識點（約需 15~30 秒）...');
 
       STATE.files.push(res.file);
       STATE.kps.push(...res.kps);
       fileInput.value = '';
       renderAll();
-      alert(`解析完成！共為你提煉出 ${res.kps.length} 個核心知識點。`);
+      alert(`解析完成！共提煉出 ${res.kps.length} 個核心知識點。`);
     }
 
     function fileToBase64(file) {
@@ -445,7 +491,7 @@
       renderAll();
     }
 
-    // 3. 渲染知識點導讀與蘇格拉底問答
+    // 3. 知識點導讀 (支援本地與試算表永久快取，0 秒讀取)
     function renderKpList() {
       const container = document.getElementById('kpListContainer');
       const kps = filterBySubject(STATE.kps);
@@ -455,42 +501,81 @@
       }
       container.innerHTML = kps.map(k => {
         const isSelected = STATE.activeKpId === k['KPID'];
+        const hasCache = k['AI精講快取'] && String(k['AI精講快取']).trim() !== '';
         const badgeColor = k['重要程度'] === '高' ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/20 text-amber-300';
         return `
           <div onclick="selectKP('${k['KPID']}')" class="cursor-pointer p-3.5 rounded-xl border transition ${isSelected ? 'bg-blue-600/20 border-blue-500' : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'}">
             <div class="flex items-center justify-between text-xs mb-1">
               <span class="text-slate-400 font-medium">${k['科目分類']}・${k['章節名稱']}</span>
-              <span class="px-2 py-0.5 rounded ${badgeColor} font-bold">考頻：${k['重要程度']}</span>
+              <div class="flex items-center gap-1.5">
+                ${hasCache
+                  ? `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">⚡ 已快取</span>`
+                  : `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400">未生成</span>`}
+                <span class="px-2 py-0.5 rounded ${badgeColor} font-bold">${k['重要程度']}</span>
+              </div>
             </div>
             <div class="text-sm font-bold text-slate-100 mb-2">${k['核心知識點']}</div>
             <div class="flex items-center justify-between text-[11px] text-slate-400">
               <span>熟練度：${k['熟練度(0-100)']}%</span>
-              <span class="text-blue-400">點擊精講 →</span>
+              <span class="text-blue-400">${hasCache ? '0 秒秒開 →' : '生成精講 →'}</span>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    async function selectKP(kpId, userQuestion = '') {
+    async function selectKP(kpId, userQuestion = '', forceRefresh = false) {
       STATE.activeKpId = kpId;
       renderKpList();
       const kp = STATE.kps.find(k => k['KPID'] === kpId);
-      document.getElementById('kpDetailHeader').innerHTML = `
+      if (!kp) return;
+
+      document.getElementById('btnRegenerateKp').classList.remove('hidden');
+      document.getElementById('kpDetailHeader').querySelector('div').innerHTML = `
         <span class="text-xs text-blue-400 font-bold">${kp['科目分類']} ／ ${kp['章節名稱']}</span>
         <h3 class="text-base font-bold mt-0.5">${kp['核心知識點']}</h3>
       `;
 
-      const res = await callBackend('EXPLAIN_KP', { kpId, userQuestion }, 'AI 教授正在根據課本原文為你推導觀念...');
-      const htmlContent = marked.parse(res.explanationMarkdown) + `
+      // 若本地記憶體已經有快取，且沒有追問、也不是強制重刷 -> 直接 0 秒渲染，完全不發網路請求！
+      if (kp['AI精講快取'] && String(kp['AI精講快取']).trim() !== '' && !userQuestion && !forceRefresh) {
+        renderKpExplanationDOM(kp['AI精講快取'], kp['蘇格拉底提問快取'], true);
+        return;
+      }
+
+      const res = await callBackend('EXPLAIN_KP', {
+        kpId,
+        userQuestion,
+        forceRefresh
+      }, userQuestion ? 'AI 教授正在回答你的追問並更新筆記...' : '首次點閱：AI 教授正在推導觀念並寫入永久快取...');
+
+      // 同步更新前端記憶體中的快取
+      kp['AI精講快取'] = res.explanationMarkdown;
+      kp['蘇格拉底提問快取'] = res.socraticQuestion;
+      renderStats();
+      renderKpList();
+      renderKpExplanationDOM(res.explanationMarkdown, res.socraticQuestion, res.fromCache);
+    }
+
+    function renderKpExplanationDOM(markdownText, socraticQ, isCached) {
+      const badge = isCached
+        ? `<div class="inline-block mb-3 px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold">⚡ 已從永久快取秒速載入（本次消耗 0 Token）</div>`
+        : `<div class="inline-block mb-3 px-2.5 py-1 rounded-md bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold">✨ AI 生成完畢並已永久存入 Google Sheets 快取</div>`;
+
+      const htmlContent = badge + marked.parse(markdownText || '') + `
         <div class="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-          <div class="text-xs font-bold text-amber-300 mb-1">💡 蘇格拉底式觀念自測（試著在下方輸入框回答看看）：</div>
-          <div class="text-sm text-slate-100 font-medium">${res.socraticQuestion}</div>
+          <div class="text-xs font-bold text-amber-300 mb-1">💡 蘇格拉底式觀念自測（可於下方輸入框回答或追問）：</div>
+          <div class="text-sm text-slate-100 font-medium">${socraticQ || ''}</div>
         </div>
       `;
       const area = document.getElementById('kpExplanationArea');
       area.innerHTML = htmlContent;
       renderMathInElement(area, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}] });
+    }
+
+    function regenerateCurrentKP() {
+      if (!STATE.activeKpId) return;
+      if (!confirm('確定要消耗 Token 重新生成這份知識點的精講嗎？')) return;
+      selectKP(STATE.activeKpId, '', true);
     }
 
     function askFollowUpOnKP() {
@@ -499,139 +584,291 @@
       const q = input.value.trim();
       if (!q) return;
       input.value = '';
-      selectKP(STATE.activeKpId, q);
+      selectKP(STATE.activeKpId, q, false);
     }
 
-    // 4. 智慧變體刷題
+    // 4. 批次刷題中心（支援既有題庫 0 Token 抽題 + AI 生成新題，全部寫完才交卷）
     function renderPracticeSelect() {
       const select = document.getElementById('practiceKpSelect');
       const kps = filterBySubject(STATE.kps);
-      if (!kps.length) {
-        select.innerHTML = `<option value="">請先上傳教材以產生知識點</option>`;
-        return;
-      }
-      select.innerHTML = kps.map(k => `<option value="${k['KPID']}">[${k['科目分類']} - ${k['章節名稱']}] ${k['核心知識點']}</option>`).join('');
+      let html = `<option value="ALL">🌟 該科目全部知識點綜合抽題</option>`;
+      html += kps.map(k => {
+        const qCount = STATE.questions.filter(q => q['KPID'] === k['KPID']).length;
+        return `<option value="${k['KPID']}">[${k['科目分類']} - ${k['章節名稱']}] ${k['核心知識點']} (既有題庫: ${qCount} 題)</option>`;
+      }).join('');
+      select.innerHTML = html;
     }
 
-    async function startPracticeQuiz() {
+    // 0 Token 從既有題庫抽題
+    function loadExistingPracticeQuiz() {
       const kpId = document.getElementById('practiceKpSelect').value;
       const count = Number(document.getElementById('practiceCountSelect').value);
-      if (!kpId) return alert('請先選擇要刷題的知識點！');
+      let pool = filterBySubject(STATE.questions);
 
-      const kp = STATE.kps.find(k => k['KPID'] === kpId);
+      if (kpId !== 'ALL') {
+        pool = pool.filter(q => q['KPID'] === kpId);
+      }
+
+      if (!pool.length) {
+        return alert('目前該知識點尚無既有題庫！請先點擊右側「⚡ 呼叫 AI 生成全新變體題」建立題庫。');
+      }
+
+      // 隨機洗牌抽題
+      const shuffled = pool.slice().sort(() => Math.random() - 0.5).slice(0, count);
+      STATE.practicePaper = shuffled.map(q => ({ ...q, userSelected: null, submitted: false }));
+      renderQuizPaper('PRACTICE');
+    }
+
+    // 呼叫 AI 生成全新變體題
+    async function generateNewPracticeQuiz() {
+      const kpId = document.getElementById('practiceKpSelect').value;
+      const count = Number(document.getElementById('practiceCountSelect').value);
+
+      let subject = STATE.subjectFilter === '全部科目' ? '會計學' : STATE.subjectFilter;
+      let targetKpId = kpId === 'ALL' ? '' : kpId;
+
+      if (targetKpId) {
+        const kp = STATE.kps.find(k => k['KPID'] === targetKpId);
+        if (kp) subject = kp['科目分類'];
+      } else if (STATE.kps.length > 0) {
+        const filteredKps = filterBySubject(STATE.kps);
+        if (filteredKps.length > 0) {
+          targetKpId = filteredKps[Math.floor(Math.random() * filteredKps.length)]['KPID'];
+          subject = filteredKps[0]['科目分類'];
+        }
+      }
+
       const res = await callBackend('GENERATE_PRACTICE', {
-        subject: kp['科目分類'],
-        kpId: kpId,
+        subject: subject,
+        kpId: targetKpId,
         count: count
-      }, 'AI 正在依據課本與老師勾選的習題，為你量身打造變體題目...');
+      }, 'AI 正在為你設計變體題目並存入題庫（寫完後統一交卷）...');
 
-      const container = document.getElementById('practiceQuestionsContainer');
-      container.innerHTML = res.questions.map((q, idx) => buildQuestionCardHTML(q, idx, 'PRACTICE')).join('');
+      STATE.questions.push(...res.questions);
+      STATE.practicePaper = res.questions.map(q => ({ ...q, userSelected: null, submitted: false }));
+      renderStats();
+      renderPracticeSelect();
+      renderQuizPaper('PRACTICE');
+    }
+
+    // 渲染考卷卡片（通用於刷題、錯題本、模擬考）
+    function renderQuizPaper(mode) {
+      let paper = [];
+      let containerId = '';
+
+      if (mode === 'PRACTICE') {
+        paper = STATE.practicePaper;
+        containerId = 'practiceQuestionsContainer';
+        document.getElementById('practiceStatusBanner').classList.toggle('hidden', paper.length === 0);
+        document.getElementById('practiceBottomBar').classList.toggle('hidden', paper.length === 0);
+        updateProgressText('PRACTICE');
+      } else if (mode === 'ERROR_BOOK') {
+        paper = STATE.errorPaper;
+        containerId = 'errorBookContainer';
+        document.getElementById('btnSubmitErrors').classList.toggle('hidden', paper.length === 0);
+      } else if (mode === 'EXAM') {
+        paper = STATE.examPaper;
+        containerId = 'examPaperContainer';
+        document.getElementById('examSubmitBar').classList.toggle('hidden', paper.length === 0);
+        updateProgressText('EXAM');
+      }
+
+      const container = document.getElementById(containerId);
+      if (!paper.length) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = paper.map((q, idx) => {
+        const options = Array.isArray(q.options) ? q.options : JSON.parse(q['選項JSON'] || '[]');
+        const qId = q['QID'];
+        const qText = q['題目內容'] || q.question;
+        const exp = q['詳解與破題邏輯'] || q.explanation;
+
+        return `
+          <div id="qcard-${mode}-${qId}" class="glass-panel rounded-2xl p-6 space-y-4 border border-slate-800 transition">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-300">第 ${idx + 1} 題</span>
+                <span class="text-xs text-slate-400">${q['科目分類'] || ''} ${q.kpName ? '・' + q.kpName : ''}</span>
+              </div>
+              <span id="status-tag-${mode}-${qId}" class="text-xs text-slate-500 font-medium">尚未作答</span>
+            </div>
+
+            <div class="text-base font-medium leading-relaxed whitespace-pre-line">${qText}</div>
+
+            <div class="space-y-2">
+              ${options.map((opt, oIdx) => {
+                const letter = ['A', 'B', 'C', 'D'][oIdx] || opt.trim().charAt(0).toUpperCase();
+                return `
+                  <button onclick="selectOptionLocal('${mode}', '${qId}', '${letter}')"
+                    id="opt-${mode}-${qId}-${letter}"
+                    class="w-full text-left p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-sm transition flex items-start gap-2">
+                    <span>${opt}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+
+            <!-- 詳解區（統一交卷後才會展開） -->
+            <div id="exp-${mode}-${qId}" class="hidden p-4 rounded-xl bg-slate-900/95 border border-slate-700 text-xs space-y-2 leading-relaxed">
+              <div id="verdict-${mode}-${qId}" class="font-bold text-sm"></div>
+              <div class="text-slate-300 whitespace-pre-line"><strong class="text-amber-400">【破題詳解与公式推導】</strong>\n${exp}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
       renderMathInElement(container, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}] });
     }
 
-    function buildQuestionCardHTML(q, idx, mode) {
-      const options = Array.isArray(q.options) ? q.options : JSON.parse(q['選項JSON'] || '[]');
-      const qText = q.question || q['題目內容'];
-      const qId = q.QID;
-      const kpId = q.KPID;
-      const ans = q.answer || q['正確答案'];
-      const exp = q.explanation || q['詳解與破題邏輯'];
+    // 本地端點選選項（0 秒即時切換，不發送 API）
+    function selectOptionLocal(mode, qId, letter) {
+      let paper = mode === 'PRACTICE' ? STATE.practicePaper : (mode === 'ERROR_BOOK' ? STATE.errorPaper : STATE.examPaper);
+      const targetQ = paper.find(q => q['QID'] === qId);
+      if (!targetQ || targetQ.submitted) return; // 已交卷鎖定不再修改
 
-      return `
-        <div id="qcard-${qId}" class="glass-panel rounded-2xl p-6 space-y-4">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-300">第 ${idx + 1} 題</span>
-            <span class="text-xs text-slate-400">${q.kpName || q['科目分類'] || ''}</span>
-          </div>
-          <div class="text-base font-medium leading-relaxed whitespace-pre-line">${qText}</div>
-          <div class="space-y-2">
-            ${options.map((opt, oIdx) => {
-              const letter = ['A', 'B', 'C', 'D'][oIdx] || opt.trim().charAt(0).toUpperCase();
-              return `
-                <button onclick="handleOptionClick('${qId}', '${kpId}', '${letter}', '${ans}', '${mode}')"
-                  id="opt-${qId}-${letter}"
-                  class="w-full text-left p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-sm transition flex items-start gap-2">
-                  <span>${opt}</span>
-                </button>
-              `;
-            }).join('')}
-          </div>
-          <div id="exp-${qId}" class="hidden p-4 rounded-xl bg-slate-900 border border-slate-700 text-xs space-y-2 leading-relaxed">
-            <div id="verdict-${qId}" class="font-bold text-sm"></div>
-            <div class="text-slate-300 whitespace-pre-line"><strong class="text-amber-400">【破題詳解】</strong>\n${exp}</div>
-          </div>
-        </div>
-      `;
+      targetQ.userSelected = letter;
+
+      ['A', 'B', 'C', 'D'].forEach(l => {
+        const btn = document.getElementById(`opt-${mode}-${qId}-${l}`);
+        if (btn) {
+          btn.className = l === letter
+            ? 'w-full text-left p-3.5 rounded-xl bg-blue-600/30 border-2 border-blue-500 text-sm font-bold text-white transition flex items-start gap-2'
+            : 'w-full text-left p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-sm text-slate-300 transition flex items-start gap-2';
+        }
+      });
+
+      const statusTag = document.getElementById(`status-tag-${mode}-${qId}`);
+      if (statusTag) {
+        statusTag.textContent = `已選 ${letter}`;
+        statusTag.className = 'text-xs text-blue-400 font-bold';
+      }
+
+      updateProgressText(mode);
     }
 
-    async function handleOptionClick(qId, kpId, selectedLetter, correctLetter, mode) {
-      if (mode === 'EXAM') {
-        // 模擬考模式：只標記選擇，交卷才批改
+    function updateProgressText(mode) {
+      let paper = mode === 'PRACTICE' ? STATE.practicePaper : STATE.examPaper;
+      const answered = paper.filter(q => q.userSelected).length;
+      const elId = mode === 'PRACTICE' ? 'practiceProgressText' : 'examProgressText';
+      const el = document.getElementById(elId);
+      if (el) el.textContent = `作答進度：已寫 ${answered} / ${paper.length} 題`;
+    }
+
+    // 統一交卷批改（刷題 & 錯題本共用，一次性展開所有詳解並批次寫入 Sheets）
+    async function submitBatchQuiz(mode) {
+      let paper = mode === 'PRACTICE' ? STATE.practicePaper : STATE.errorPaper;
+      if (!paper.length) return;
+
+      const unanswered = paper.filter(q => !q.userSelected).length;
+      if (unanswered > 0) {
+        if (!confirm(`還有 ${unanswered} 題尚未作答，確定要直接交卷批改嗎？`)) return;
+      }
+
+      let correctCount = 0;
+      const batchPayload = [];
+
+      paper.forEach(q => {
+        q.submitted = true;
+        const qId = q['QID'];
+        const ans = (q['正確答案'] || q.answer || '').trim().toUpperCase();
+        const userAns = q.userSelected;
+        const isCorrect = userAns === ans;
+        if (isCorrect) correctCount++;
+
+        // 標記正確與錯誤選項顏色
         ['A', 'B', 'C', 'D'].forEach(l => {
-          const btn = document.getElementById(`opt-${qId}-${l}`);
-          if (btn) btn.className = 'w-full text-left p-3.5 rounded-xl bg-slate-900/80 border border-slate-700 text-sm transition flex items-start gap-2';
+          const btn = document.getElementById(`opt-${mode}-${qId}-${l}`);
+          if (!btn) return;
+          if (l === ans) {
+            btn.className = 'w-full text-left p-3.5 rounded-xl bg-emerald-600/30 border-2 border-emerald-500 text-sm font-bold text-emerald-200 flex items-start gap-2';
+          } else if (l === userAns && !isCorrect) {
+            btn.className = 'w-full text-left p-3.5 rounded-xl bg-rose-600/30 border-2 border-rose-500 text-sm font-bold text-rose-200 flex items-start gap-2';
+          }
         });
-        const activeBtn = document.getElementById(`opt-${qId}-${selectedLetter}`);
-        if (activeBtn) activeBtn.className = 'w-full text-left p-3.5 rounded-xl bg-blue-600/30 border-2 border-blue-500 text-sm font-bold transition flex items-start gap-2';
-        const targetQ = STATE.currentExamQuestions.find(item => item.QID === qId);
-        if (targetQ) targetQ.userSelected = selectedLetter;
-        return;
+
+        // 展開詳解
+        const expBox = document.getElementById(`exp-${mode}-${qId}`);
+        const verdict = document.getElementById(`verdict-${mode}-${qId}`);
+        if (expBox && verdict) {
+          expBox.classList.remove('hidden');
+          verdict.innerHTML = isCorrect
+            ? `<span class="text-emerald-400">✅ 答對了！（你的答案：${userAns}）${mode === 'ERROR_BOOK' ? ' — 已從錯題本清零移除！' : ''}</span>`
+            : `<span class="text-rose-400">❌ 答錯了！（你的答案：${userAns || '未作答'} ／ 正確答案：${ans}） — 已自動收錄至錯題本</span>`;
+        }
+
+        batchPayload.push({
+          qId: qId,
+          kpId: q['KPID'],
+          isCorrect: isCorrect,
+          removeFromErrorBook: mode === 'ERROR_BOOK' && isCorrect
+        });
+      });
+
+      const score = Math.round((correctCount / paper.length) * 100);
+      if (mode === 'PRACTICE') {
+        document.getElementById('practiceProgressText').innerHTML = `🎉 批改完成！本次得分：<span class="text-amber-400 text-base">${score} 分</span>（答對 ${correctCount} / ${paper.length} 題）`;
+        document.getElementById('practiceBottomBar').classList.add('hidden');
       }
 
-      // 刷題或錯題本模式：即時批改並寫入資料庫
-      const isCorrect = selectedLetter === correctLetter;
-      const expBox = document.getElementById(`exp-${qId}`);
-      const verdict = document.getElementById(`verdict-${qId}`);
-      expBox.classList.remove('hidden');
-
-      if (isCorrect) {
-        verdict.innerHTML = `<span class="text-emerald-400">✅ 答對了！觀念非常紮實！${mode === 'ERROR_BOOK' ? '（已自動從錯題本移除）' : ''}</span>`;
-      } else {
-        verdict.innerHTML = `<span class="text-rose-400">❌ 答錯了！正確答案為 ${correctLetter}（已自動收錄至錯題本）</span>`;
-      }
-
-      await callBackend('SUBMIT_ANSWER', {
-        qId,
-        kpId,
-        isCorrect,
-        removeFromErrorBook: mode === 'ERROR_BOOK' && isCorrect
-      }, '正在記錄作答結果與更新熟練度...');
-
+      // 單一 API 請求整批寫入 Google Sheets
+      await callBackend('SUBMIT_BATCH_ANSWERS', { results: batchPayload }, '正在將整份作答結果與錯題紀錄一次寫入 Google Sheets...');
       await syncAllData();
     }
 
-    // 5. 錯題本清零專區
+    // 5. 錯題本渲染
     function renderErrorBook() {
-      const container = document.getElementById('errorBookContainer');
       const errors = filterBySubject(STATE.questions).filter(q => q['收錄於錯題本'] === '是');
+      STATE.errorPaper = errors.map(q => ({ ...q, userSelected: null, submitted: false }));
+      const container = document.getElementById('errorBookContainer');
       if (!errors.length) {
+        document.getElementById('btnSubmitErrors').classList.add('hidden');
         container.innerHTML = `<div class="glass-panel rounded-2xl p-10 text-center text-emerald-400 font-bold text-sm">🎉 太強了！目前沒有任何待清零的錯題！</div>`;
         return;
       }
-      container.innerHTML = errors.map((q, idx) => buildQuestionCardHTML(q, idx, 'ERROR_BOOK')).join('');
-      renderMathInElement(container, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}] });
+      renderQuizPaper('ERROR_BOOK');
     }
 
-    // 6. 期中模擬考實戰
-    async function startMockExam() {
+    // 6. 模擬考實戰（支援 0 Token 本地組卷 & AI 全新命題）
+    function startLocalMockExam() {
+      const subject = document.getElementById('examSubjectSelect').value;
+      const count = Number(document.getElementById('examCountSelect').value);
+      const pool = STATE.questions.filter(q => q['科目分類'] === subject);
+
+      if (!pool.length) {
+        return alert(`目前【${subject}】題庫尚無題目，請先點擊右側「🔥 呼叫 AI 全新命題模擬考」！`);
+      }
+
+      // 錯題優先加權排序
+      const sorted = pool.slice().sort((a, b) => {
+        const errDiff = (Number(b['累計答錯次數']) || 0) - (Number(a['累計答錯次數']) || 0);
+        return errDiff !== 0 ? errDiff : Math.random() - 0.5;
+      }).slice(0, count);
+
+      STATE.examPaper = sorted.map(q => ({ ...q, userSelected: null, submitted: false }));
+      launchExamSession();
+    }
+
+    async function startAiMockExam() {
       const subject = document.getElementById('examSubjectSelect').value;
       const count = Number(document.getElementById('examCountSelect').value);
 
       const res = await callBackend('GENERATE_MOCK_EXAM', {
         subject,
         count
-      }, 'AI 命題教授正在調閱你的錯題本與課本重點，組裝期中模擬考卷...');
+      }, 'AI 命題教授正在組裝期中模擬考卷...');
 
-      STATE.currentExamQuestions = res.questions;
+      STATE.questions.push(...res.questions);
+      STATE.examPaper = res.questions.map(q => ({ ...q, userSelected: null, submitted: false }));
+      renderStats();
+      launchExamSession();
+    }
+
+    function launchExamSession() {
       document.getElementById('examResultDiagnosis').classList.add('hidden');
-      document.getElementById('examSubmitBar').classList.remove('hidden');
+      renderQuizPaper('EXAM');
 
-      const paper = document.getElementById('examPaperContainer');
-      paper.innerHTML = res.questions.map((q, idx) => buildQuestionCardHTML(q, idx, 'EXAM')).join('');
-      renderMathInElement(paper, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}] });
-
-      // 啟動計時器
       STATE.examSecondsElapsed = 0;
       const timerBox = document.getElementById('examTimerBox');
       timerBox.classList.remove('hidden');
@@ -645,48 +882,73 @@
     }
 
     async function submitMockExam() {
-      if (!STATE.currentExamQuestions.length) return;
+      if (!STATE.examPaper.length) return;
+      const unanswered = STATE.examPaper.filter(q => !q.userSelected).length;
+      if (unanswered > 0 && !confirm(`還有 ${unanswered} 題未作答，確定要正式交卷嗎？`)) return;
+
       clearInterval(STATE.examTimerInterval);
 
       let correctCount = 0;
       const wrongQuestions = [];
+      const batchPayload = [];
 
-      for (const q of STATE.currentExamQuestions) {
-        const isCorrect = q.userSelected === q.answer;
+      STATE.examPaper.forEach(q => {
+        q.submitted = true;
+        const qId = q['QID'];
+        const ans = (q['正確答案'] || q.answer || '').trim().toUpperCase();
+        const userAns = q.userSelected;
+        const isCorrect = userAns === ans;
+
         if (isCorrect) {
           correctCount++;
         } else {
-          wrongQuestions.push({ kpName: q.kpName, question: q.question, userSelected: q.userSelected || '未作答', answer: q.answer });
+          wrongQuestions.push({
+            question: q['題目內容'] || q.question,
+            userSelected: userAns || '未作答',
+            answer: ans
+          });
         }
 
-        // 顯示每題詳解
-        const expBox = document.getElementById(`exp-${q.QID}`);
-        const verdict = document.getElementById(`verdict-${q.QID}`);
+        ['A', 'B', 'C', 'D'].forEach(l => {
+          const btn = document.getElementById(`opt-EXAM-${qId}-${l}`);
+          if (!btn) return;
+          if (l === ans) {
+            btn.className = 'w-full text-left p-3.5 rounded-xl bg-emerald-600/30 border-2 border-emerald-500 text-sm font-bold text-emerald-200 flex items-start gap-2';
+          } else if (l === userAns && !isCorrect) {
+            btn.className = 'w-full text-left p-3.5 rounded-xl bg-rose-600/30 border-2 border-rose-500 text-sm font-bold text-rose-200 flex items-start gap-2';
+          }
+        });
+
+        const expBox = document.getElementById(`exp-EXAM-${qId}`);
+        const verdict = document.getElementById(`verdict-EXAM-${qId}`);
         if (expBox && verdict) {
           expBox.classList.remove('hidden');
           verdict.innerHTML = isCorrect
-            ? `<span class="text-emerald-400">✅ 作答正確（你的選擇：${q.userSelected}）</span>`
-            : `<span class="text-rose-400">❌ 作答錯誤（你的選擇：${q.userSelected || '未作答'} ／ 正確答案：${q.answer}，已自動加入錯題本）</span>`;
+            ? `<span class="text-emerald-400">✅ 作答正確（你的選擇：${userAns}）</span>`
+            : `<span class="text-rose-400">❌ 作答錯誤（你的選擇：${userAns || '未作答'} ／ 正確答案：${ans}，已自動收錄至錯題本）</span>`;
         }
 
-        // 同步寫入錯題記錄
-        await callBackend('SUBMIT_ANSWER', {
-          qId: q.QID,
-          kpId: q.KPID,
+        batchPayload.push({
+          qId: qId,
+          kpId: q['KPID'],
           isCorrect: isCorrect,
           removeFromErrorBook: false
-        }, '正在批閱考卷並收錄錯題...');
-      }
+        });
+      });
 
-      const score = Math.round((correctCount / STATE.currentExamQuestions.length) * 100);
+      const score = Math.round((correctCount / STATE.examPaper.length) * 100);
       const subject = document.getElementById('examSubjectSelect').value;
+      const useAiDiagnosis = document.getElementById('useAiDiagnosisCheck').checked;
+
+      await callBackend('SUBMIT_BATCH_ANSWERS', { results: batchPayload }, '正在批次批閱考卷並收錄錯題...');
 
       const diagRes = await callBackend('SAVE_EXAM_RESULT', {
         subject,
         score,
         durationSec: STATE.examSecondsElapsed,
-        wrongQuestions
-      }, 'AI 正在分析你的考卷並生成弱點戰力報告...');
+        wrongQuestions,
+        useAiDiagnosis
+      }, '正在記錄模擬考成績...');
 
       const diagBox = document.getElementById('examResultDiagnosis');
       diagBox.classList.remove('hidden');
@@ -694,10 +956,10 @@
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
             <span class="text-xs text-emerald-400 font-bold">模擬考批閱完成</span>
-            <h4 class="text-xl font-black mt-0.5">最終得分：<span class="text-amber-400">${score} 分</span>（答對 ${correctCount} / ${STATE.currentExamQuestions.length} 題，耗時 ${STATE.examSecondsElapsed} 秒）</h4>
+            <h4 class="text-xl font-black mt-0.5">最終得分：<span class="text-amber-400">${score} 分</span>（答對 ${correctCount} / ${STATE.examPaper.length} 題，耗時 ${STATE.examSecondsElapsed} 秒）</h4>
           </div>
         </div>
-        <div class="text-sm text-slate-200 whitespace-pre-line leading-relaxed pt-2"><strong class="text-blue-400">🎯 AI 考前衝刺弱點診斷：</strong>\n${diagRes.diagnosis}</div>
+        <div class="text-sm text-slate-200 whitespace-pre-line leading-relaxed pt-2"><strong class="text-blue-400">🎯 考後診斷報告：</strong>\n${diagRes.diagnosis}</div>
       `;
 
       document.getElementById('examSubmitBar').classList.add('hidden');
@@ -726,7 +988,6 @@
       `).join('');
     }
 
-    // 介面切換與彈窗控制
     function switchTab(tabId) {
       ['tab-files', 'tab-review', 'tab-practice', 'tab-errors', 'tab-exam'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
